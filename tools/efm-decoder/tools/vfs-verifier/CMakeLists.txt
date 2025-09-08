@@ -14,8 +14,8 @@ add_executable(${TARGET_NAME} ${SRC_FILES})
 target_include_directories(${TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/efm/include
-    ${Qt5Core_INCLUDE_DIRS}
-    ${Qt5Widgets_INCLUDE_DIRS}
+    ${Qt6Core_INCLUDE_DIRS}
+    ${Qt6Widgets_INCLUDE_DIRS}
 )
 
 # Link the Qt libraries
@@ -25,6 +25,6 @@ target_link_libraries(${TARGET_NAME} PRIVATE Qt::Core)
 target_link_libraries(${TARGET_NAME} PRIVATE efm)
 
 # Add the library directory for the EFM library
-target_link_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/../../libs/efm/lib)
+target_link_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/tools/efm-decoder/libs/efm/lib)
 
 install(TARGETS ${TARGET_NAME})
