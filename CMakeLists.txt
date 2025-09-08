@@ -1,10 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(ld-decode-tools)
+# Ensure custom module path comes first
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
+
+option(USE_QWT "Enable Qwt-based analysis UI (ld-analyse plotting dialogs)" ON)
+
+if(USE_QWT)
+    find_package(Qwt MODULE)
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake_modules")
 include(CTest)
-
+if(APPLE)
+    set(CMAKE_MACOSX_RPATH ON)
+endif()
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
