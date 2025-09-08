@@ -10,6 +10,6 @@ add_executable(ld-process-vbi
     whiteflag.cpp
 )
 
-target_link_libraries(ld-process-vbi PRIVATE Qt::Core lddecode-library)
+target_link_libraries(ld-process-vbi PRIVATE Qt6::Core lddecode-library)
 
 install(TARGETS ld-process-vbi)
