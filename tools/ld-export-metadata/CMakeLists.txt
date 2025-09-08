@@ -6,6 +6,6 @@ add_executable(ld-export-metadata
     main.cpp
 )
 
-target_link_libraries(ld-export-metadata PRIVATE Qt::Core lddecode-library)
+target_link_libraries(ld-export-metadata PRIVATE Qt5::Core lddecode-library)
 
 install(TARGETS ld-export-metadata)
