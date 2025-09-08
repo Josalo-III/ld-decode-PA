@@ -14,4 +14,4 @@ add_library(lddecode-library STATIC
 
 target_include_directories(lddecode-library PUBLIC filter tbc)
 
-target_link_libraries(lddecode-library PRIVATE Qt::Core)
+target_link_libraries(lddecode-library PRIVATE Qt6::Core)
