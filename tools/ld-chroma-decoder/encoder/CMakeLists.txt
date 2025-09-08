@@ -9,6 +9,6 @@ add_executable(ld-chroma-encoder
     palencoder.cpp
 )
 
-target_link_libraries(ld-chroma-encoder PRIVATE Qt::Core lddecode-library)
+target_link_libraries(ld-chroma-encoder PRIVATE Qt6::Core lddecode-library)
 
 install(TARGETS ld-chroma-encoder)
