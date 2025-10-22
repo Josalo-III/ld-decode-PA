@@ -1,6 +1,7 @@
 # A collection of helper functions used in dev notebooks and lddecode_core.py
 
 from collections import namedtuple
+import itertools
 import json
 import math
 import os
@@ -1314,11 +1315,40 @@ def init_opencl(cl, name = None):
     #queue = cl.CommandQueue(ctx)
     return ctx
 
+class FieldInfo:
+    def __init__(self, field_history_size=3):
+        self._field_history_size = field_history_size
+        # store previous field references in a ring buffer
+        self._fieldinfo = np.empty(field_history_size, dtype=object)
+        self._fieldinfo_unsent = []
+        self._len = 0
+
+    def __len__(self):
+        return self._len
+    
+    # called like a normal python list, where -1 is the last element, -2 the one before that, etc.
+    # using [0] is not allowed since this only stores the end of the list
+    def __getitem__(self, key):
+        assert key < 0, "Attempted to get a field that has not been written"
+        assert key > -self._field_history_size, "Attempted to get a field that is not buffered"
+        return self._fieldinfo[(self._len + key) % self._field_history_size]
+
+    def read(self):
+        unsent = self._fieldinfo_unsent
+        self._fieldinfo_unsent = []
+        return unsent
+    
+    def append(self, value):
+        self._fieldinfo[self._len % self._field_history_size] = value
+        self._fieldinfo_unsent.append(value)
+        self._len += 1
+
 class JSONDumper:
     def __init__(self, ldd, outname):
         self._rx, self._tx = Pipe(False)
         self._writing = Event()
         self._build_json = ldd.build_json
+        self._get_field_info = ldd.fieldinfo.read
 
         self._outname = outname
         self._dumper = Process(target=JSONDumper._consume, args=(self._rx, self._writing, self._outname, ldd.verboseVITS,), name="lddecode-json-dumper")
@@ -1326,43 +1356,77 @@ class JSONDumper:
     
     def write(self):
         if not self._writing.is_set():
-            self._tx.send(self._build_json())
+            json_data = self._build_json()
+            field_info = self._get_field_info()
+            self._tx.send(json_data)
+            self._tx.send(field_info)
 
     def close(self):
-        self._tx.send(self._build_json())
+        json_data = self._build_json()
+        field_info = self._get_field_info()
+        self._tx.send(json_data)
+        self._tx.send(field_info)
+
         self._tx.send(None)
         self._dumper.join()
-
-    @staticmethod
-    def write_json(jsondict, outname, verboseVITS):
-        fp = open(outname + ".tbc.json.tmp", "w")
-        json.dump(
-            jsondict,
-            fp,
-            allow_nan=False,
-            indent=4 if verboseVITS else None,
-            separators=(",", ":") if not verboseVITS else None,
-        )
-        fp.write("\n")
-        fp.close()
-    
-        os.replace(outname + ".tbc.json.tmp", outname + ".tbc.json")
 
     @staticmethod
     def _consume(conn, ready, outname, verboseVITS):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+        indent = 4 if verboseVITS else None
+        linebreak = '\n' if verboseVITS else ''
+        separators = None if verboseVITS else (',', ':')
+        separator = ',' + linebreak
+        field_info = []
+
         while True:
             try:
                 jsondict = conn.recv()
+                if jsondict is None:
+                    break
+
+                next_field_info = conn.recv()
                 ready.set()
             except (InterruptedError, KeyboardInterrupt, EOFError):
                 break
-        
-            if jsondict is None:
-                break
-    
-            JSONDumper.write_json(jsondict, outname, verboseVITS)
+
+            # json serialize each field info object to a string
+            serialized_field_info = []
+            for field in next_field_info:
+                serialized_field_info.append(
+                    json.dumps(
+                        field,
+                        allow_nan=False,
+                        indent=indent,
+                        separators=separators
+                    )
+                )
+
+            field_info.append(serialized_field_info)
+
+            f = open(outname + ".tbc.json.tmp", "w")
+            f.write('{'+linebreak)
+            # write the field metadata
+            for (k, v) in jsondict.items():
+                json.dump(k, f, allow_nan=False, indent=indent, separators=separators)
+                f.write(':')
+                json.dump(v, f, allow_nan=False, indent=indent, separators=separators)
+                f.write(separator)
+
+            # Write the field info
+            f.write('"fields":['+linebreak)
+            for i, field in enumerate(itertools.chain.from_iterable(field_info)):
+                if i != 0:
+                    f.write(separator)
+
+                f.write(field)
+            f.write(linebreak+']'+linebreak+'}')
+
+            f.write('\n')
+            f.close()
+            os.replace(outname + ".tbc.json.tmp", outname + ".tbc.json")
+
             ready.clear()
 
 class StridedCollector:
